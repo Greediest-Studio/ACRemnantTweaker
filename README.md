@@ -38,6 +38,10 @@
 
 ### 使用 CraftTweaker（推荐整合包作者使用）
 
+> 📘 **[查看完整的 CraftTweaker 使用指南](CRAFTTWEAKER使用指南.md)** - 包含详细教程、示例和调试技巧
+
+**快速开始：**
+
 在 `scripts/` 文件夹中创建一个 ZenScript 文件（例如 `scripts/remnant.zs`）：
 
 ```zenscript
@@ -301,6 +305,7 @@ public static void init(FMLPreInitializationEvent event) {
 
 ## 📚 文档
 
+- **[CraftTweaker 使用指南](CRAFTTWEAKER使用指南.md)** - 详细的自定义交易教程
 - **[示例脚本](example_scripts/)** - 可直接使用的 ZenScript 示例
 
 ---

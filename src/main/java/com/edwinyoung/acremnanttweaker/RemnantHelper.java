@@ -54,10 +54,23 @@ public class RemnantHelper {
     }
 
     /**
-     * 存储每个职业的自定义交易
-     * Key: 职业ID, Value: 该职业的交易列表
+     * 交易条目，包含交易和概率
      */
-    private static final Map<Integer, List<MerchantRecipe>> CUSTOM_TRADES = new HashMap<>();
+    private static class TradeEntry {
+        final MerchantRecipe recipe;
+        final float probability;
+
+        TradeEntry(MerchantRecipe recipe, float probability) {
+            this.recipe = recipe;
+            this.probability = probability;
+        }
+    }
+
+    /**
+     * 存储每个职业的自定义交易
+     * Key: 职业ID, Value: 该职业的交易列表（包含概率）
+     */
+    private static final Map<Integer, List<TradeEntry>> CUSTOM_TRADES = new HashMap<>();
 
     /**
      * 存储要移除的交易（通过匹配输入输出物品）
@@ -66,18 +79,64 @@ public class RemnantHelper {
     private static final Map<Integer, List<TradeRemovalPattern>> TRADE_REMOVALS = new HashMap<>();
 
     /**
-     * 添加一个新的交易到指定职业
+     * 添加一个新的交易到指定职业（单个输入物品，默认100%概率）
      * 
      * @param profession 职业
      * @param input1 第一个输入物品
      * @param output 输出物品
      */
     public static void addTrade(RemnantProfession profession, ItemStack input1, ItemStack output) {
-        addTrade(profession, input1, ItemStack.EMPTY, output);
+        addTrade(profession, input1, ItemStack.EMPTY, output, 1.0F);
     }
 
     /**
-     * 添加一个新的交易到指定职业（带两个输入物品）
+     * 添加一个新的交易到指定职业（单个输入物品，自定义概率）
+     * 
+     * @param profession 职业
+     * @param input1 第一个输入物品
+     * @param output 输出物品
+     * @param probability 出现概率（0.0-1.0），例如 0.5 表示 50% 概率
+     */
+    public static void addTrade(RemnantProfession profession, ItemStack input1, ItemStack output, float probability) {
+        addTrade(profession, input1, ItemStack.EMPTY, output, probability);
+    }
+
+    /**
+     * 添加一个新的交易到指定职业（带两个输入物品和概率）
+     * 
+     * @param profession 职业
+     * @param input1 第一个输入物品
+     * @param input2 第二个输入物品
+     * @param output 输出物品
+     * @param probability 出现概率（0.0-1.0），例如 0.5 表示 50% 概率
+     */
+    public static void addTrade(RemnantProfession profession, ItemStack input1, ItemStack input2, ItemStack output, float probability) {
+        ACRemnantTweaker.LOGGER.info("[RemnantHelper] addTrade called: profession={}, input1={}, input2={}, output={}, probability={}",
+            profession, input1, input2, output, probability);
+        
+        if (input1.isEmpty() || output.isEmpty()) {
+            ACRemnantTweaker.LOGGER.warn("Attempting to add invalid trade: input or output is empty - input1.isEmpty()={}, output.isEmpty()={}",
+                input1.isEmpty(), output.isEmpty());
+            ACRemnantTweaker.LOGGER.warn("  input1={}", input1);
+            ACRemnantTweaker.LOGGER.warn("  input2={}", input2);
+            ACRemnantTweaker.LOGGER.warn("  output={}", output);
+            return;
+        }
+
+        TradeEntry entry = new TradeEntry(new MerchantRecipe(input1, input2, output), probability);
+        
+        CUSTOM_TRADES.computeIfAbsent(profession.getId(), k -> new ArrayList<>()).add(entry);
+        
+        ACRemnantTweaker.LOGGER.info("Added trade to profession {} ({}) with {}% chance: {} + {} -> {}", 
+            profession.getDisplayName(), profession.getId(),
+            (int)(probability * 100),
+            input1.getDisplayName(), 
+            input2.isEmpty() ? "none" : input2.getDisplayName(), 
+            output.getDisplayName());
+    }
+
+    /**
+     * 添加一个新的交易到指定职业（带两个输入物品，默认100%概率）
      * 
      * @param profession 职业
      * @param input1 第一个输入物品
@@ -85,20 +144,7 @@ public class RemnantHelper {
      * @param output 输出物品
      */
     public static void addTrade(RemnantProfession profession, ItemStack input1, ItemStack input2, ItemStack output) {
-        if (input1.isEmpty() || output.isEmpty()) {
-            ACRemnantTweaker.LOGGER.warn("尝试添加无效的交易：输入或输出为空");
-            return;
-        }
-
-        MerchantRecipe recipe = new MerchantRecipe(input1, input2, output);
-        
-        CUSTOM_TRADES.computeIfAbsent(profession.getId(), k -> new ArrayList<>()).add(recipe);
-        
-        ACRemnantTweaker.LOGGER.info("添加交易到职业 {} ({}): {} + {} -> {}", 
-            profession.getDisplayName(), profession.getId(),
-            input1.getDisplayName(), 
-            input2.isEmpty() ? "无" : input2.getDisplayName(), 
-            output.getDisplayName());
+        addTrade(profession, input1, input2, output, 1.0F);
     }
 
     /**
@@ -180,21 +226,55 @@ public class RemnantHelper {
     }
 
     /**
-     * 应用自定义交易到交易列表
-     * 该方法应该在交易列表生成后调用
+     * 将自定义交易添加到候选池（在 shuffle 之前）
+     * 这样自定义交易会和原版交易一起参与随机抽取
      * 
      * @param profession 职业ID
-     * @param recipeList 交易列表
+     * @param candidateList 候选交易列表（在 shuffle 之前）
+     * @param rand 随机数生成器
      */
-    public static void applyCustomTrades(int profession, MerchantRecipeList recipeList) {
-        if (recipeList == null) {
+    public static void addCustomTradesToPool(int profession, MerchantRecipeList candidateList, java.util.Random rand) {
+        if (candidateList == null) {
+            ACRemnantTweaker.LOGGER.warn("addCustomTradesToPool called with null candidateList for profession {}", profession);
             return;
         }
+
+        ACRemnantTweaker.LOGGER.info("Adding custom trades to pool for profession {}. Current candidate count: {}", profession, candidateList.size());
+        
+        // 添加自定义交易到候选池
+        List<TradeEntry> customTrades = CUSTOM_TRADES.get(profession);
+        if (customTrades != null && !customTrades.isEmpty()) {
+            for (TradeEntry entry : customTrades) {
+                // 根据概率判断是否加入候选池
+                if (rand.nextFloat() < entry.probability) {
+                    MerchantRecipe recipe = entry.recipe;
+                    MerchantRecipe newRecipe = new MerchantRecipe(
+                        recipe.getItemToBuy().copy(),
+                        recipe.getSecondItemToBuy().isEmpty() ? ItemStack.EMPTY : recipe.getSecondItemToBuy().copy(),
+                        recipe.getItemToSell().copy()
+                    );
+                    candidateList.add(newRecipe);
+                    ACRemnantTweaker.LOGGER.info("  Added custom trade to pool ({}% chance passed): {} + {} -> {}",
+                        (int)(entry.probability * 100),
+                        newRecipe.getItemToBuy().getDisplayName(),
+                        newRecipe.getSecondItemToBuy().isEmpty() ? "none" : newRecipe.getSecondItemToBuy().getDisplayName(),
+                        newRecipe.getItemToSell().getDisplayName());
+                } else {
+                    ACRemnantTweaker.LOGGER.debug("  Custom trade failed probability check ({}%): {} -> {}",
+                        (int)(entry.probability * 100),
+                        entry.recipe.getItemToBuy().getDisplayName(),
+                        entry.recipe.getItemToSell().getDisplayName());
+                }
+            }
+        }
+        
+        ACRemnantTweaker.LOGGER.info("Final candidate pool size for profession {}: {} (will be shuffled and {} selected)", 
+            profession, candidateList.size(), 1);
 
         // 移除标记的交易
         List<TradeRemovalPattern> removals = TRADE_REMOVALS.get(profession);
         if (removals != null && !removals.isEmpty()) {
-            Iterator<MerchantRecipe> iterator = recipeList.iterator();
+            Iterator<MerchantRecipe> iterator = candidateList.iterator();
             while (iterator.hasNext()) {
                 MerchantRecipe recipe = iterator.next();
                 for (TradeRemovalPattern pattern : removals) {
@@ -209,24 +289,6 @@ public class RemnantHelper {
             }
         }
 
-        // 添加自定义交易
-        List<MerchantRecipe> customTrades = CUSTOM_TRADES.get(profession);
-        if (customTrades != null && !customTrades.isEmpty()) {
-            for (MerchantRecipe recipe : customTrades) {
-                // 创建新的副本以避免共享问题
-                MerchantRecipe newRecipe = new MerchantRecipe(
-                    recipe.getItemToBuy().copy(),
-                    recipe.getSecondItemToBuy().isEmpty() ? ItemStack.EMPTY : recipe.getSecondItemToBuy().copy(),
-                    recipe.getItemToSell().copy()
-                );
-                recipeList.add(newRecipe);
-                ACRemnantTweaker.LOGGER.debug("添加自定义交易到职业 {}: {} + {} -> {}", 
-                    profession,
-                    newRecipe.getItemToBuy().getDisplayName(),
-                    newRecipe.getSecondItemToBuy().isEmpty() ? "无" : newRecipe.getSecondItemToBuy().getDisplayName(),
-                    newRecipe.getItemToSell().getDisplayName());
-            }
-        }
     }
 
     /**

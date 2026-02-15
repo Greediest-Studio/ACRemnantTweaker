@@ -6,6 +6,7 @@ import crafttweaker.annotations.ModOnly;
 import crafttweaker.annotations.ZenRegister;
 import crafttweaker.api.item.IItemStack;
 import crafttweaker.api.minecraft.CraftTweakerMC;
+import net.minecraft.item.ItemStack;
 import stanhebben.zenscript.annotations.Optional;
 import stanhebben.zenscript.annotations.ZenClass;
 import stanhebben.zenscript.annotations.ZenMethod;
@@ -45,15 +46,21 @@ public class Remnant {
      */
     @ZenMethod
     public static void addTrade(String profession, IItemStack input, IItemStack output) {
+        ACRemnantTweaker.LOGGER.info("[CraftTweaker] Calling addTrade: profession={}, input={}, output={}", 
+            profession, input, output);
         try {
             RemnantHelper.RemnantProfession prof = parseProfession(profession);
+            ItemStack mcInput = CraftTweakerMC.getItemStack(input);
+            ItemStack mcOutput = CraftTweakerMC.getItemStack(output);
+            ACRemnantTweaker.LOGGER.info("[CraftTweaker] Converted ItemStack: input={} (isEmpty={}), output={} (isEmpty={})",
+                mcInput, mcInput.isEmpty(), mcOutput, mcOutput.isEmpty());
             RemnantHelper.addTrade(
                 prof,
-                CraftTweakerMC.getItemStack(input),
-                CraftTweakerMC.getItemStack(output)
+                mcInput,
+                mcOutput
             );
         } catch (Exception e) {
-            ACRemnantTweaker.LOGGER.error("添加Remnant交易失败: " + e.getMessage(), e);
+            ACRemnantTweaker.LOGGER.error("Failed to add Remnant trade: " + e.getMessage(), e);
         }
     }
 
@@ -72,16 +79,96 @@ public class Remnant {
      */
     @ZenMethod
     public static void addTrade(String profession, IItemStack input1, IItemStack input2, IItemStack output) {
+        ACRemnantTweaker.LOGGER.info("[CraftTweaker] Calling addTrade(3 params): profession={}, input1={}, input2={}, output={}", 
+            profession, input1, input2, output);
         try {
             RemnantHelper.RemnantProfession prof = parseProfession(profession);
+            ItemStack mcInput1 = CraftTweakerMC.getItemStack(input1);
+            ItemStack mcInput2 = CraftTweakerMC.getItemStack(input2);
+            ItemStack mcOutput = CraftTweakerMC.getItemStack(output);
+            ACRemnantTweaker.LOGGER.info("[CraftTweaker] Converted ItemStack: input1={} (isEmpty={}), input2={} (isEmpty={}), output={} (isEmpty={})",
+                mcInput1, mcInput1.isEmpty(), mcInput2, mcInput2.isEmpty(), mcOutput, mcOutput.isEmpty());
             RemnantHelper.addTrade(
                 prof,
-                CraftTweakerMC.getItemStack(input1),
-                CraftTweakerMC.getItemStack(input2),
-                CraftTweakerMC.getItemStack(output)
+                mcInput1,
+                mcInput2,
+                mcOutput
             );
         } catch (Exception e) {
-            ACRemnantTweaker.LOGGER.error("添加Remnant交易失败: " + e.getMessage(), e);
+            ACRemnantTweaker.LOGGER.error("Failed to add Remnant trade: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 添加一个新的交易到指定职业（单个输入物品，自定义概率）
+     * 
+     * @param profession 职业名称
+     * @param input 输入物品
+     * @param output 输出物品
+     * @param probability 交易出现的概率，范围 0.0～1.0（0.0=永不出现，1.0=必定出现，0.5=50%概率）
+     * 
+     * 示例:
+     * <pre>
+     * // 低概率稀有交易（10%概率）
+     * Remnant.addTrade("cleric", <abyssalcraft:coin:3> * 32, <minecraft:diamond>, 0.1);
+     * // 高概率常见交易（80%概率）  
+     * Remnant.addTrade("blacksmith", <abyssalcraft:coin:3> * 8, <minecraft:iron_ingot>, 0.8);
+     * </pre>
+     */
+    @ZenMethod
+    public static void addTrade(String profession, IItemStack input, IItemStack output, float probability) {
+        ACRemnantTweaker.LOGGER.info("[CraftTweaker] Calling addTrade with probability: profession={}, input={}, output={}, probability={}", 
+            profession, input, output, probability);
+        try {
+            RemnantHelper.RemnantProfession prof = parseProfession(profession);
+            ItemStack mcInput = CraftTweakerMC.getItemStack(input);
+            ItemStack mcOutput = CraftTweakerMC.getItemStack(output);
+            RemnantHelper.addTrade(
+                prof,
+                mcInput,
+                mcOutput,
+                probability
+            );
+        } catch (Exception e) {
+            ACRemnantTweaker.LOGGER.error("Failed to add Remnant trade: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 添加一个新的交易到指定职业（两个输入物品，自定义概率）
+     * 
+     * @param profession 职业名称
+     * @param input1 第一个输入物品
+     * @param input2 第二个输入物品
+     * @param output 输出物品
+     * @param probability 交易出现的概率，范围 0.0～1.0（0.0=永不出现，1.0=必定出现，0.5=50%概率）
+     * 
+     * 示例:
+     * <pre>
+     * // 低概率稀有交易（20%概率）
+     * Remnant.addTrade("librarian", <abyssalcraft:necronomicon>, <abyssalcraft:coin:3> * 16, <minecraft:enchanted_book>, 0.2);
+     * // 必定出现的交易（100%概率，等同于不指定概率）
+     * Remnant.addTrade("butcher", <abyssalcraft:coin:3> * 20, <abyssalcraft:dreadcloth> * 8, <additions:nefrath_cloth>, 1.0);
+     * </pre>
+     */
+    @ZenMethod
+    public static void addTrade(String profession, IItemStack input1, IItemStack input2, IItemStack output, float probability) {
+        ACRemnantTweaker.LOGGER.info("[CraftTweaker] Calling addTrade(3 params) with probability: profession={}, input1={}, input2={}, output={}, probability={}", 
+            profession, input1, input2, output, probability);
+        try {
+            RemnantHelper.RemnantProfession prof = parseProfession(profession);
+            ItemStack mcInput1 = CraftTweakerMC.getItemStack(input1);
+            ItemStack mcInput2 = CraftTweakerMC.getItemStack(input2);
+            ItemStack mcOutput = CraftTweakerMC.getItemStack(output);
+            RemnantHelper.addTrade(
+                prof,
+                mcInput1,
+                mcInput2,
+                mcOutput,
+                probability
+            );
+        } catch (Exception e) {
+            ACRemnantTweaker.LOGGER.error("Failed to add Remnant trade: " + e.getMessage(), e);
         }
     }
 

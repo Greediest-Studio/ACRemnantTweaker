@@ -137,7 +137,84 @@ Remnant.addTrade("priest",
 );
 ```
 
-### 3. 移除交易
+### 3. 自定义概率交易
+
+从 1.0.0 版本开始，你可以为交易设置**出现概率**，让自定义交易与原版交易一样参与随机抽取：
+
+#### 单输入 + 概率
+
+```zenscript
+Remnant.addTrade(职业, 输入物品, 输出物品, 概率);
+```
+
+#### 双输入 + 概率
+
+```zenscript
+Remnant.addTrade(职业, 输入物品1, 输入物品2, 输出物品, 概率);
+```
+
+**概率值说明：**
+- 取值范围：`0.0` 至 `1.0`
+- `0.0` = 永不出现（相当于禁用）
+- `1.0` = 必定出现（100% 概率，与不指定概率时相同）
+- `0.5` = 50% 概率
+- `0.1` = 10% 概率（稀有）
+
+**交易机制：**
+1. 游戏会根据概率随机决定每个交易是否加入候选池
+2. 候选池中的所有交易（包括原版交易）会被打乱顺序
+3. 残存者从打乱后的池中选择第 1 个交易显示给玩家
+4. 因此每次召唤的残存者可能显示不同的交易
+
+**示例：**
+
+```zenscript
+// 高概率（90%）- 常见交易
+Remnant.addTrade("farmer", <minecraft:wheat> * 32, <abyssalcraft:coin:3>, 0.9);
+
+// 中等概率（50%）- 随机交易
+Remnant.addTrade("blacksmith", <minecraft:iron_ingot> * 16, <abyssalcraft:coin:3>, 0.5);
+
+// 低概率（10%）- 稀有交易
+Remnant.addTrade("banker", 
+    <abyssalcraft:coin:3>, 
+    <minecraft:diamond> * 5, 
+    0.1
+);
+
+// 极低概率（1%）- 超稀有交易，双输入
+Remnant.addTrade("priest",
+    <abyssalcraft:necronomicon>,
+    <abyssalcraft:coin:3> * 64,
+    <minecraft:nether_star>,
+    0.01
+);
+
+// 必定出现（100%）- 等同于不指定概率
+Remnant.addTrade("butcher", 
+    <minecraft:wheat> * 10, 
+    <minecraft:leather>, 
+    1.0
+);
+```
+
+**实用技巧：**
+- 如果希望交易**总是出现**，使用 `1.0` 或直接省略概率参数
+- 如果希望交易**很少出现**（稀有奖励），使用 `0.05` ~ `0.2`
+- 如果希望交易**偶尔出现**（平衡游戏难度），使用 `0.3` ~ `0.7`
+- 如果希望完全禁用某个交易而不删除代码，使用 `0.0`
+
+### 4. 移除交易
+
+从职业中移除特定的交易：
+
+```zenscript
+Remnant.removeTrade(职业, 输入物品, 输出物品);
+```
+
+**参数说明：**
+- 使用 `null` 表示"任意物品"
+### 4. 移除交易
 
 从职业中移除特定的交易：
 
@@ -162,7 +239,7 @@ Remnant.removeTrade("blacksmith", <minecraft:coal>, null);
 Remnant.removeTrade("butcher", <minecraft:wheat>, <minecraft:leather>);
 ```
 
-### 4. 移除所有交易
+### 5. 移除所有交易
 
 清空某个职业的所有交易：
 
@@ -182,7 +259,7 @@ Remnant.addTrade("farmer", <minecraft:potato> * 64, <abyssalcraft:coin:3>);
 Remnant.addTrade("farmer", <minecraft:carrot> * 64, <abyssalcraft:coin:3>);
 ```
 
-### 5. 设置售卖数量
+### 6. 设置售卖数量
 
 调整玩家**卖给**残存者时需要的物品数量：
 
@@ -207,7 +284,7 @@ Remnant.setItemSellingQuantity(<minecraft:gold_ingot>, 8, 12);
 Remnant.setItemSellingQuantity(<minecraft:coal>, 16, 24);
 ```
 
-### 6. 设置购买价格
+### 7. 设置购买价格
 
 调整玩家**从残存者购买**物品时需要的硬币数量：
 
@@ -449,6 +526,94 @@ Remnant.addTrade("librarian", <abyssalcraft:coin:3> * 10, <minecraft:enchanted_b
 Remnant.addTrade("librarian", <abyssalcraft:coin:3> * 15, <minecraft:enchanting_table>);
 ```
 
+### 示例 7：稀有度系统 - 使用概率创建抽奖式交易
+
+利用概率参数创建不同稀有度的交易，让玩家探索时充满惊喜：
+
+```zenscript
+import mods.acremnanttweaker.Remnant;
+
+// === 银行家 - 宝石抽奖系统 ===
+// 常见奖励（80% 概率）
+Remnant.addTrade("banker", 
+    <abyssalcraft:coin:3> * 5, 
+    <minecraft:emerald> * 2, 
+    0.8
+);
+
+// 稀有奖励（30% 概率）
+Remnant.addTrade("banker", 
+    <abyssalcraft:coin:3> * 10, 
+    <minecraft:diamond> * 4, 
+    0.3
+);
+
+// 超稀有奖励（5% 概率）
+Remnant.addTrade("banker", 
+    <abyssalcraft:coin:3> * 20, 
+    <minecraft:nether_star>, 
+    0.05
+);
+
+// === 铁匠 - 装备抽奖 ===
+// 普通装备（必定出现）
+Remnant.addTrade("blacksmith", 
+    <abyssalcraft:coin:3> * 3, 
+    <minecraft:iron_sword>, 
+    1.0
+);
+
+// 附魔装备（50% 概率）
+val sharpnessSword = <minecraft:diamond_sword>.withTag({
+    ench: [{lvl: 3 as short, id: 16 as short}]
+});
+Remnant.addTrade("blacksmith", 
+    <abyssalcraft:coin:3> * 15, 
+    sharpnessSword, 
+    0.5
+);
+
+// 神器级装备（1% 概率 - 超级稀有！）
+val godSword = <minecraft:diamond_sword>.withTag({
+    ench: [
+        {lvl: 5 as short, id: 16 as short},  // 锋利 V
+        {lvl: 2 as short, id: 20 as short},  // 火焰附加 II
+        {lvl: 3 as short, id: 21 as short}   // 抢夺 III
+    ]
+});
+Remnant.addTrade("blacksmith", 
+    <abyssalcraft:coin:3> * 50, 
+    godSword, 
+    0.01
+);
+
+// === 图书管理员 - 知识宝库 ===
+// 普通附魔书（70% 概率）
+Remnant.addTrade("librarian", 
+    <abyssalcraft:coin:3> * 8, 
+    <minecraft:enchanted_book>, 
+    0.7
+);
+
+// 稀有书籍（20% 概率）
+Remnant.addTrade("librarian", 
+    <abyssalcraft:coin:3> * 15, 
+    <minecraft:enchanting_table>, 
+    0.2
+);
+
+// === 提示 ===
+// 这样设置后，每次召唤残存者都可能遇到不同的交易！
+// 有些残存者可能只有普通交易，有些可能运气好遇到稀有交易
+// 玩家需要探索更多的残存者才能找到心仪的交易
+```
+
+**这个系统的优势：**
+- 增加探索乐趣：玩家需要找多个残存者才能触发稀有交易
+- 平衡游戏难度：强力物品不会轻易获得
+- 模拟抽卡体验：每次遇见残存者都像开盲盒
+- 与原版融合：自定义交易和原版交易一起随机，感觉更自然
+
 ---
 
 ## 常见问题
@@ -524,6 +689,64 @@ Remnant.addTrade("farmer", <minecraft:potato> * 24, <abyssalcraft:coin:3>);
 2. **稀有资源** → 硬币：给较多硬币（2-5个）
 3. **硬币** → **重要物品**：需要较多硬币（10-30个）
 4. **考虑游戏进度**：早期玩家应该能通过简单资源获得少量硬币
+
+### Q9: 概率是如何工作的？
+
+**A:** 交易概率系统的工作流程：
+1. **概率检查**：每个交易按照其概率（0.0-1.0）随机决定是否加入候选池
+   - 例如概率 0.5 的交易有 50% 几率加入池中
+2. **混合原版**：自定义交易和原版交易会放在同一个候选池中
+3. **随机打乱**：所有候选交易会被随机打乱顺序
+4. **选择交易**：残存者从打乱后的池中选择**第 1 个**交易显示
+
+**这意味着什么？**
+- 每个残存者通常只显示 **1 个**交易
+- 高概率交易更容易出现，但不保证
+- 低概率交易很少出现，需要多找几个残存者
+- 自定义交易和原版交易混在一起，体验更自然
+
+**示例场景：**
+假设铁匠有以下交易：
+- 原版交易 A（概率 0.5）
+- 原版交易 B（概率 0.3）
+- 自定义交易 C（概率 1.0）
+- 自定义交易 D（概率 0.2）
+
+当生成铁匠残存者时：
+- 交易 A 有 50% 几率进入候选池
+- 交易 B 有 30% 几率进入候选池
+- 交易 C 必定进入候选池（100%）
+- 交易 D 有 20% 几率进入候选池
+- 进入池中的交易被打乱，残存者显示第 1 个
+
+**结果：** 每次生成的铁匠可能显示不同交易！
+
+### Q10: 为什么我设置了概率 1.0 但交易有时还是不出现？
+
+**A:** 这是正常现象！原因有两个：
+
+1. **原版交易竞争**：
+   - 即使你的交易概率是 1.0（100%），它也会和原版交易一起打乱
+   - 残存者只会选择第 1 个交易
+   - 所以你的交易可能被"排在后面"而没有显示
+
+2. **解决方法**：
+   ```zenscript
+   // 方法 1：移除原版交易，只保留自定义的
+   Remnant.removeAllTrades("farmer");
+   Remnant.addTrade("farmer", <minecraft:wheat> * 32, <abyssalcraft:coin:3>, 1.0);
+   
+   // 方法 2：添加多个自定义交易，增加出现几率
+   Remnant.addTrade("farmer", <minecraft:wheat> * 32, <abyssalcraft:coin:3>, 1.0);
+   Remnant.addTrade("farmer", <minecraft:carrot> * 24, <abyssalcraft:coin:3>, 1.0);
+   Remnant.addTrade("farmer", <minecraft:potato> * 24, <abyssalcraft:coin:3>, 1.0);
+   // 现在至少会显示一个自定义交易的可能性更高
+   ```
+
+3. **多找几个残存者**：
+   - 这是设计特性，不是 bug
+   - 鼓励玩家探索，找到合适的残存者
+   - 让每个残存者的交易更独特
 
 ---
 
